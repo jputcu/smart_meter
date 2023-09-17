@@ -3,3 +3,5 @@ CMakeListsPrivate.txt
 cmake-build-*/
 # generated
 CMakeLists*.txt
+hw/*backups
+.idea
