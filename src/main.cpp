@@ -65,7 +65,6 @@ namespace {
             digitalWrite(LED, LOW);
             delay(250);
         }
-        digitalWrite(LED, LOW);
         delay(500);
     }
 }
@@ -76,7 +75,6 @@ void setup() {
     digitalWrite(LED, HIGH);
     delay(1000);
     digitalWrite(LED, LOW);
-    delay(1000);
 
     Serial.begin(115200);
     reader.enable(true);
