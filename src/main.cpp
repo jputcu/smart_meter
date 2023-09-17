@@ -41,6 +41,9 @@ namespace {
     >;
     constexpr uint8_t REQUEST_PIN = 2;
     P1Reader reader(&Serial, REQUEST_PIN);
+    constexpr unsigned long POLL_INTERVAL_MS = 5000;
+    constexpr uint16_t FORCE_SEND_S = 3600; // So domoticz knows the sensor is still alive
+    uint16_t FORCE_SECONDS_PASSED = 0;
 
     uint32_t last_watt_average = 0;
     MovingAveragePlus<decltype(last_watt_average)> watt_average(5);
@@ -89,24 +92,30 @@ void presentation() {
 void loop() {
     if( reader.loop() ) {
         MyData data;
-        if (reader.parse(&data, nullptr)) {
+        if (reader.parse(data, nullptr)) {
             digitalWrite(LED, HIGH);
+
+            const bool force_send = FORCE_SECONDS_PASSED >= FORCE_SEND_S;
+            if( force_send ) {
+                FORCE_SECONDS_PASSED = 0;
+            }
+
             {
                 auto current_watt = data.power_delivered.int_val();
                 watt_average.push(current_watt);
                 auto new_average = watt_average.get();
-                if (new_average != last_watt_average) {
+                if ((new_average != last_watt_average) || force_send) {
                     if (!send(wattMsg.set(new_average)))
                         on_error(ErrorType::SendError);
                     last_watt_average = new_average;
                 }
             }
-#if 0
+
             {
                 const float elec_tariff1 = data.energy_delivered_tariff1;
                 const float elec_tariff2 = data.energy_delivered_tariff2;
                 const float total_elec = elec_tariff1 + elec_tariff2;
-                if (total_elec != last_total_elec) {
+                if ((total_elec != last_total_elec) || force_send) {
                     if (!send(kWhMsg.set(total_elec, 3)))
                         on_error(ErrorType::SendError);
                     last_total_elec = total_elec;
@@ -115,20 +124,20 @@ void loop() {
 
             {
                 const float current_gas = data.gas_delivered_be;
-                if (last_gas != current_gas) {
+                if ((last_gas != current_gas) || force_send) {
                     if (!send(gas_vol.set(current_gas, 3)))
                         on_error(ErrorType::SendError);
                     last_gas = current_gas;
                 }
             }
-#endif
             digitalWrite(LED, LOW);
         } else {
             on_error(ErrorType::ParseError);
             //Serial.println(res.fullError(str, end));
         }
 
-        delay(5000);
+        delay(POLL_INTERVAL_MS);
+        FORCE_SECONDS_PASSED += POLL_INTERVAL_MS/1000;
 
         reader.enable(true);
     }
