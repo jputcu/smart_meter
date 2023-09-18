@@ -40,7 +40,7 @@ namespace {
             //,gas_valve_position
     >;
     constexpr uint8_t REQUEST_PIN = 2;
-    P1Reader reader(&Serial, REQUEST_PIN);
+    P1Reader reader(Serial, REQUEST_PIN);
     constexpr unsigned long POLL_INTERVAL_MS = 5000;
     constexpr uint16_t FORCE_SEND_S = 3600; // So domoticz knows the sensor is still alive
     uint16_t FORCE_SECONDS_PASSED = 0;
