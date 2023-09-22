@@ -42,7 +42,7 @@ namespace {
     constexpr uint8_t REQUEST_PIN = 2;
     P1Reader reader(Serial, REQUEST_PIN);
     constexpr unsigned long POLL_INTERVAL_MS = 5000;
-    constexpr uint16_t FORCE_SEND_S = 3600; // So domoticz knows the sensor is still alive
+    constexpr uint16_t FORCE_SEND_S = 3000; // So domoticz knows the sensor is still alive
     uint16_t FORCE_SECONDS_PASSED = 0;
 
     uint32_t last_watt_average = 0;
@@ -57,16 +57,16 @@ namespace {
     MyMessage gas_vol(GAS_CHILD_ID, V_VOLUME);
 
     enum class ErrorType : uint8_t {
-        ParseError = 4,
-        SendError
+        SendError = 1,
+        ParseError
     };
 
     void on_error(ErrorType errno) {
         for (uint8_t i = 0; i < static_cast<uint8_t>(errno); ++i) {
             digitalWrite(LED, HIGH);
-            delay(250);
+            delay(300);
             digitalWrite(LED, LOW);
-            delay(250);
+            delay(300);
         }
         delay(500);
     }
@@ -93,8 +93,6 @@ void loop() {
     if( reader.loop() ) {
         MyData data;
         if (reader.parse(data, nullptr)) {
-            digitalWrite(LED, HIGH);
-
             const bool force_send = FORCE_SECONDS_PASSED >= FORCE_SEND_S;
             if( force_send ) {
                 FORCE_SECONDS_PASSED = 0;
@@ -105,9 +103,10 @@ void loop() {
                 watt_average.push(current_watt);
                 auto new_average = watt_average.get();
                 if ((new_average != last_watt_average) || force_send) {
-                    if (!send(wattMsg.set(new_average)))
+                    if (send(wattMsg.set(new_average)))
+                        last_watt_average = new_average;
+                    else
                         on_error(ErrorType::SendError);
-                    last_watt_average = new_average;
                 }
             }
 
@@ -116,21 +115,22 @@ void loop() {
                 const float elec_tariff2 = data.energy_delivered_tariff2;
                 const float total_elec = elec_tariff1 + elec_tariff2;
                 if ((total_elec != last_total_elec) || force_send) {
-                    if (!send(kWhMsg.set(total_elec, 3)))
+                    if (send(kWhMsg.set(total_elec, 3)))
+                        last_total_elec = total_elec;
+                    else
                         on_error(ErrorType::SendError);
-                    last_total_elec = total_elec;
                 }
             }
 
             {
                 const float current_gas = data.gas_delivered_be;
                 if ((last_gas != current_gas) || force_send) {
-                    if (!send(gas_vol.set(current_gas, 3)))
+                    if (send(gas_vol.set(current_gas, 3)))
+                        last_gas = current_gas;
+                    else
                         on_error(ErrorType::SendError);
-                    last_gas = current_gas;
                 }
             }
-            digitalWrite(LED, LOW);
         } else {
             on_error(ErrorType::ParseError);
             //Serial.println(res.fullError(str, end));
