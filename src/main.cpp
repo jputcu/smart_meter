@@ -58,7 +58,7 @@ namespace {
 
     enum class ErrorType : uint8_t {
         SendError = 1,
-        ParseError
+        DsmrErrorOffset
     };
 
     void on_error(ErrorType errno) {
@@ -92,7 +92,8 @@ void presentation() {
 void loop() {
     if( reader.loop() ) {
         MyData data;
-        if (reader.parse(data, nullptr)) {
+        auto parse_res = reader.parse(data, nullptr);
+        if (parse_res.err == dsmr::Error::na) {
             const bool force_send = FORCE_SECONDS_PASSED >= FORCE_SEND_S;
             if( force_send ) {
                 FORCE_SECONDS_PASSED = 0;
@@ -132,7 +133,10 @@ void loop() {
                 }
             }
         } else {
-            on_error(ErrorType::ParseError);
+            on_error(static_cast<ErrorType>(
+                    static_cast<uint8_t>(ErrorType::DsmrErrorOffset)
+                    + static_cast<uint8_t>(parse_res.err))
+                    );
             //Serial.println(res.fullError(str, end));
         }
 
